@@ -36,9 +36,6 @@ module Danger
     # Maximum number of issues to be reported.
     attr_accessor :max_num_violations
 
-    # Provides additional logging diagnostic information.
-    attr_accessor :verbose
-
     # Whether all files should be linted in one pass
     attr_accessor :lint_all_files
 
@@ -263,13 +260,9 @@ module Danger
 
       # Make Tailor object for binary_path
       #
-      # @return [SwiftLint]
+      # @return [Tailor]
       def tailor
         Tailor.new(binary_path)
-      end
-
-      def log(text)
-        puts(text) if @verbose
       end
     end
   end
