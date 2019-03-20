@@ -2,7 +2,7 @@
 require 'yaml'
 require 'find'
 require 'shellwords'
-require_relative '../ext/tailor/tailor'
+require_relative '../../ext/tailor/tailor'
 
 module Danger
   # Shows the build errors, warnings and violations generated from Tailor.
