@@ -107,7 +107,7 @@ module Danger
         warn other_issues_message(other_issues_count) if other_issues_count > 0
       elsif warnings.count > 0 || errors.count > 0
         # Report if any warning or error
-        message = "### SwiftLint found issues\n\n".dup
+        message = "### Tailor found issues\n\n".dup
         message << markdown_issues(warnings, 'Warnings') unless warnings.empty?
         message << markdown_issues(errors, 'Errors') unless errors.empty?
         message << "\n#{other_issues_message(other_issues_count)}" if other_issues_count > 0
@@ -148,14 +148,17 @@ end
         if result == ''
           {}
         else
-          JSON.parse(result).flatten
+          JSON.parse(result)['files']
+          .map { |s| s['violations'].map {|v| v['path'] = s['path']; v } }
+          .flatten
         end
       else
         files
           .map { |file| options.merge(path: file) }
           .map { |full_options| tailor.run(full_options, additional_tailor_args) }
           .reject { |s| s == '' }
-          .map { |s| JSON.parse(s).flatten }
+          .map { |s| JSON.parse(s)['files'].first }
+          .map { |s| s['violations'].map {|v| v['path'] = s['path']; v } }
           .flatten
       end
     end
@@ -191,6 +194,84 @@ end
         next true if included_paths.empty?
         file_exists?(included_paths, file)
       end
+
+      # Return whether the file exists within a specified collection of paths
+    #
+    # @return [Bool] file exists within specified collection of paths
+    def file_exists?(paths, file)
+      paths.any? do |path|
+        Find.find(path)
+            .map { |path_file| Shellwords.escape(path_file) }
+            .include?(file)
+      end
+    end
+
+    # Parses the configuration file and return the specified files in path
+    #
+    # @return [Array] list of files specified in path
+    def format_paths(paths, filepath)
+      # Extract included paths
+      paths
+        .map { |path| File.join(File.dirname(filepath), path) }
+        .map { |path| File.expand_path(path) }
+        .select { |path| File.exist?(path) || Dir.exist?(path) }
+    end
+
+    # Create a markdown table from swiftlint issues
+    #
+    # @return  [String]
+    def markdown_issues(results, heading)
+      message = "#### #{heading}\n\n".dup
+
+      message << "File | Line | Reason |\n"
+      message << "| --- | ----- | ----- |\n"
+
+      results.each do |r|
+        filename = r['path'].split('/').last
+        line = r['location']['line']
+        reason = r['message']
+        rule = r['rule']
+        message << "#{filename} | #{line} | #{reason} (#{rule})\n"
+      end
+
+      message
+    end
+
+    # Send inline comment with danger's warn or fail method
+    #
+    # @return [void]
+    def send_inline_comment(results, method)
+      dir = "#{Dir.pwd}/"
+      results.each do |r|
+        github_filename = r['path'].gsub(dir, '')
+        message = "#{r['message']}".dup
+
+        # extended content here
+        filename = r['path'].split('/').last
+        message << "\n"
+        message << "`#{r['rule']}`" # helps writing exceptions // swiftlint:disable:this rule_id
+        message << " `#{filename}:#{r['location']['line']}`" # file:line for pasting into Xcode Quick Open
+
+        send(method, message, file: github_filename, line: r['location']['line'])
+      end
+    end
+
+    def other_issues_message(issues_count)
+      violations = issues_count == 1 ? 'violation' : 'violations'
+      "Tailor also found #{issues_count} more #{violations} with this PR."
+    end
+
+    # Make SwiftLint object for binary_path
+    #
+    # @return [SwiftLint]
+    def tailor
+      DangerTailor.new(binary_path)
+    end
+
+    def log(text)
+      puts(text) if @verbose
+    end
+end
     end
   end
 end
