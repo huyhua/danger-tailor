@@ -7,12 +7,12 @@ class Tailor
   end
 
   # Runs tailor
-  def run(options = {}, additional_tailor_args = '')
+  def run(file_path = '.', options = {}, additional_tailor_args = '')
     # change pwd before run tailor
     Dir.chdir options.delete(:pwd) if options.key? :pwd
 
     # run tailor with provided options
-    `#{tailor_path} #{tailor_arguments(options, additional_tailor_args)}`
+    `#{tailor_path} #{file_path} #{tailor_arguments(options, additional_tailor_args)}`
   end
 
   # Return true if tailor is installed or false otherwise

@@ -73,6 +73,8 @@ module Danger
       files = find_swift_files(dir_selected, files, excluded_paths, included_paths)
       log "Tailor will lint the following files: #{files.join(', ')}"
 
+
+
       # Prepare Tailor options
       options = {
         # Make sure we don't fail when config path has spaces
@@ -135,7 +137,7 @@ module Danger
     # @return [Array] swiftlint issues
     def run_tailor(files, lint_all_files, options, additional_tailor_args)
       if lint_all_files
-        result = tailor.run(options, additional_swiftlint_args)
+        result = tailor.run('.', options, additional_swiftlint_args)
         if result == ''
           {}
         else
@@ -145,8 +147,7 @@ module Danger
         end
       else
         files
-        .map { |file| options.merge(path: file) }
-        .map { |full_options| tailor.run(full_options, additional_tailor_args) }
+        .map { |full_options| tailor.run(file, full_options, additional_tailor_args) }
         .reject { |s| s == '' }
         .map { |s| JSON.parse(s)['files'].first }
         .map { |s| s['violations'].map {|v| v['path'] = s['path']; v } }
