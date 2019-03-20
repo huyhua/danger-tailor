@@ -6,8 +6,8 @@ require 'version.rb'
 Gem::Specification.new do |spec|
   spec.name          = 'danger-tailor'
   spec.version       = Tailor::VERSION
-  spec.authors       = ['Patrick Butkiewicz']
-  spec.email         = ['patrick@intrepid.io']
+  spec.authors       = ['Huy Hua']
+  spec.email         = ['huyhua@nvg.vn]
   spec.description   = 'Show formatted static analysis reports in your PRs'
   spec.summary       = 'A [Danger](https://danger.systems) plugin that shows ' \
                         'warnings and errors generated from the Tailor ' \

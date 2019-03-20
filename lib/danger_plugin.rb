@@ -261,11 +261,11 @@ end
       "Tailor also found #{issues_count} more #{violations} with this PR."
     end
 
-    # Make SwiftLint object for binary_path
+    # Make Tailor object for binary_path
     #
     # @return [SwiftLint]
     def tailor
-      DangerTailor.new(binary_path)
+      Tailor.new(binary_path)
     end
 
     def log(text)
