@@ -1,3 +1,3 @@
 module Tailor
-  VERSION = '1.2.6'.freeze
+  VERSION = '1.0.1'.freeze
 end

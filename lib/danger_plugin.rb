@@ -253,7 +253,7 @@ module Danger
     # Make Tailor object for binary_path
     #
     # @return [Tailor]
-    def tailor_wrapper
+    def tailor
       Tailor.new(binary_path)
     end
   end
