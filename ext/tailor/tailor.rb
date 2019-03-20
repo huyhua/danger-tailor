@@ -51,6 +51,6 @@ class Tailor
 
   # Path where tailor should be found
   def default_tailor_path
-    File.expand_path(File.join(File.dirname(__FILE__), 'bin', 'tailor'))
+    '/usr/local/bin/tailor'
   end
 end
