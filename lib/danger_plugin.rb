@@ -3,7 +3,7 @@
 require 'yaml'
 require 'find'
 require 'shellwords'
-require_relative '../ext/tailor/tailor'
+require_relative '../ext/tailor/tailor_wrapper'
 
 module Danger
   # Shows the build errors, warnings and violations generated from Tailor.
@@ -41,7 +41,7 @@ module Danger
 
     def report(files = nil, inline_mode: false, fail_on_error: false, additional_tailor_args: '', &select_block)
       # Fails if tailor isn't installed
-      raise 'tailor is not installed' unless tailor.installed?
+      raise 'tailor is not installed' unless tailor_wrapper.installed?
 
       config_file_path = if config_file
         config_file
@@ -141,7 +141,7 @@ module Danger
     # @return [Array] swiftlint issues
     def run_tailor(files, lint_all_files, options, additional_tailor_args)
       if lint_all_files
-        result = tailor.run(options, additional_swiftlint_args)
+        result = tailor_wrapper.run(options, additional_swiftlint_args)
         if result == ''
           {}
         else
@@ -152,7 +152,7 @@ module Danger
       else
         files
         .map { |file| options.merge(path: file) }
-        .map { |full_options| tailor.run(full_options, additional_tailor_args) }
+        .map { |full_options| tailor_wrapper.run(full_options, additional_tailor_args) }
         .reject { |s| s == '' }
         .map { |s| JSON.parse(s)['files'].first }
         .map { |s| s['violations'].map {|v| v['path'] = s['path']; v } }
@@ -261,7 +261,7 @@ module Danger
       # Make Tailor object for binary_path
       #
       # @return [Tailor]
-      def tailor
+      def tailor_wrapper
         Tailor.new(binary_path)
       end
     end
