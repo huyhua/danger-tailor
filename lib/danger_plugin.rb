@@ -147,7 +147,7 @@ module Danger
         end
       else
         files
-        .map { |full_options| tailor.run(file, full_options, additional_tailor_args) }
+        .map { |file| tailor.run(file, options, additional_tailor_args) }
         .reject { |s| s == '' }
         .map { |s| JSON.parse(s)['files'].first }
         .map { |s| s['violations'].map {|v| v['path'] = s['path']; v } }

@@ -7,7 +7,7 @@ class Tailor
   end
 
   # Runs tailor
-  def run(file_path = '.', options = {}, additional_tailor_args = '')
+  def run(file_path = '', options = {}, additional_tailor_args = '')
     # change pwd before run tailor
     Dir.chdir options.delete(:pwd) if options.key? :pwd
 
