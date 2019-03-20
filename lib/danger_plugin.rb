@@ -41,7 +41,7 @@ module Danger
 
     # Whether all files should be linted in one pass
     attr_accessor :lint_all_files
-    
+
     def report(files = nil, inline_mode: false, fail_on_error: false, additional_tailor_args: '', &select_block)
       # Fails if tailor isn't installed
       raise 'tailor is not installed' unless tailor.installed?
@@ -55,6 +55,9 @@ module Danger
 
       dir_selected = directory ? File.expand_path(directory) : Dir.pwd
       log "Tailor will be run from #{dir_selected}"
+
+      # Get config
+      config = load_config(config_file_path)
 
       # Extract excluded paths
       excluded_paths = format_paths(config['excluded'] || [], config_file_path)
