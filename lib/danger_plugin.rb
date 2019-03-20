@@ -117,7 +117,7 @@ module Danger
         if fail_on_error && errors.count > 0
           fail 'Failed due to SwiftLint errors'
         end
-end
+      end
     end
 
     private
@@ -154,12 +154,12 @@ end
         end
       else
         files
-          .map { |file| options.merge(path: file) }
-          .map { |full_options| tailor.run(full_options, additional_tailor_args) }
-          .reject { |s| s == '' }
-          .map { |s| JSON.parse(s)['files'].first }
-          .map { |s| s['violations'].map {|v| v['path'] = s['path']; v } }
-          .flatten
+        .map { |file| options.merge(path: file) }
+        .map { |full_options| tailor.run(full_options, additional_tailor_args) }
+        .reject { |s| s == '' }
+        .map { |s| JSON.parse(s)['files'].first }
+        .map { |s| s['violations'].map {|v| v['path'] = s['path']; v } }
+        .flatten
       end
     end
 
@@ -173,105 +173,104 @@ end
 
       # Assign files to lint
       files = if files.nil?
-                (git.modified_files - git.deleted_files) + git.added_files
-              else
-                Dir.glob(files)
-              end
+        (git.modified_files - git.deleted_files) + git.added_files
+      else
+        Dir.glob(files)
+      end
       # Filter files to lint
       files.
-        # Ensure only swift files are selected
-        select { |file| file.end_with?('.swift') }.
-        # Make sure we don't fail when paths have spaces
-        map { |file| Shellwords.escape(File.expand_path(file)) }.
-        # Remove dups
-        uniq.
-        # Ensure only files in the selected directory
-        select { |file| file.start_with?(dir_selected) }.
-        # Reject files excluded on configuration
-        reject { |file| file_exists?(excluded_paths, file) }.
-        # Accept files included on configuration
-        select do |file|
+      # Ensure only swift files are selected
+      select { |file| file.end_with?('.swift') }.
+      # Make sure we don't fail when paths have spaces
+      map { |file| Shellwords.escape(File.expand_path(file)) }.
+      # Remove dups
+      uniq.
+      # Ensure only files in the selected directory
+      select { |file| file.start_with?(dir_selected) }.
+      # Reject files excluded on configuration
+      reject { |file| file_exists?(excluded_paths, file) }.
+      # Accept files included on configuration
+      select do |file|
         next true if included_paths.empty?
         file_exists?(included_paths, file)
       end
 
       # Return whether the file exists within a specified collection of paths
-    #
-    # @return [Bool] file exists within specified collection of paths
-    def file_exists?(paths, file)
-      paths.any? do |path|
-        Find.find(path)
-            .map { |path_file| Shellwords.escape(path_file) }
-            .include?(file)
+      #
+      # @return [Bool] file exists within specified collection of paths
+      def file_exists?(paths, file)
+        paths.any? do |path|
+          Find.find(path)
+          .map { |path_file| Shellwords.escape(path_file) }
+          .include?(file)
+        end
       end
-    end
 
-    # Parses the configuration file and return the specified files in path
-    #
-    # @return [Array] list of files specified in path
-    def format_paths(paths, filepath)
-      # Extract included paths
-      paths
+      # Parses the configuration file and return the specified files in path
+      #
+      # @return [Array] list of files specified in path
+      def format_paths(paths, filepath)
+        # Extract included paths
+        paths
         .map { |path| File.join(File.dirname(filepath), path) }
         .map { |path| File.expand_path(path) }
         .select { |path| File.exist?(path) || Dir.exist?(path) }
-    end
-
-    # Create a markdown table from swiftlint issues
-    #
-    # @return  [String]
-    def markdown_issues(results, heading)
-      message = "#### #{heading}\n\n".dup
-
-      message << "File | Line | Reason |\n"
-      message << "| --- | ----- | ----- |\n"
-
-      results.each do |r|
-        filename = r['path'].split('/').last
-        line = r['location']['line']
-        reason = r['message']
-        rule = r['rule']
-        message << "#{filename} | #{line} | #{reason} (#{rule})\n"
       end
 
-      message
-    end
+      # Create a markdown table from swiftlint issues
+      #
+      # @return  [String]
+      def markdown_issues(results, heading)
+        message = "#### #{heading}\n\n".dup
 
-    # Send inline comment with danger's warn or fail method
-    #
-    # @return [void]
-    def send_inline_comment(results, method)
-      dir = "#{Dir.pwd}/"
-      results.each do |r|
-        github_filename = r['path'].gsub(dir, '')
-        message = "#{r['message']}".dup
+        message << "File | Line | Reason |\n"
+        message << "| --- | ----- | ----- |\n"
 
-        # extended content here
-        filename = r['path'].split('/').last
-        message << "\n"
-        message << "`#{r['rule']}`" # helps writing exceptions // swiftlint:disable:this rule_id
-        message << " `#{filename}:#{r['location']['line']}`" # file:line for pasting into Xcode Quick Open
+        results.each do |r|
+          filename = r['path'].split('/').last
+          line = r['location']['line']
+          reason = r['message']
+          rule = r['rule']
+          message << "#{filename} | #{line} | #{reason} (#{rule})\n"
+        end
 
-        send(method, message, file: github_filename, line: r['location']['line'])
+        message
       end
-    end
 
-    def other_issues_message(issues_count)
-      violations = issues_count == 1 ? 'violation' : 'violations'
-      "Tailor also found #{issues_count} more #{violations} with this PR."
-    end
+      # Send inline comment with danger's warn or fail method
+      #
+      # @return [void]
+      def send_inline_comment(results, method)
+        dir = "#{Dir.pwd}/"
+        results.each do |r|
+          github_filename = r['path'].gsub(dir, '')
+          message = "#{r['message']}".dup
 
-    # Make Tailor object for binary_path
-    #
-    # @return [SwiftLint]
-    def tailor
-      Tailor.new(binary_path)
-    end
+          # extended content here
+          filename = r['path'].split('/').last
+          message << "\n"
+          message << "`#{r['rule']}`" # helps writing exceptions // swiftlint:disable:this rule_id
+          message << " `#{filename}:#{r['location']['line']}`" # file:line for pasting into Xcode Quick Open
 
-    def log(text)
-      puts(text) if @verbose
-    end
-end
+          send(method, message, file: github_filename, line: r['location']['line'])
+        end
+      end
+
+      def other_issues_message(issues_count)
+        violations = issues_count == 1 ? 'violation' : 'violations'
+        "Tailor also found #{issues_count} more #{violations} with this PR."
+      end
+
+      # Make Tailor object for binary_path
+      #
+      # @return [SwiftLint]
+      def tailor
+        Tailor.new(binary_path)
+      end
+
+      def log(text)
+        puts(text) if @verbose
+      end
     end
   end
 end
