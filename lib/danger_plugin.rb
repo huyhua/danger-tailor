@@ -81,7 +81,8 @@ module Danger
       options = {
         # Make sure we don't fail when config path has spaces
         config: config_file_path ? Shellwords.escape(config_file_path) : nil,
-        format: 'json'
+        format: 'json',
+        pwd: dir_selected
       }
       log "linting with options: #{options}"
 
