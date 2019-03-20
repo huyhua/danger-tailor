@@ -1,3 +1,9 @@
+
+require 'yaml'
+require 'find'
+require 'shellwords'
+require_relative '../ext/tailor/tailor'
+
 module Danger
   # Shows the build errors, warnings and violations generated from Tailor.
   # You need [Tailor](https://tailor.sh) installed and generating a json file
@@ -17,46 +23,100 @@ module Danger
   # @tags xcode, swift, tailor, lint, format, xcodebuild
   #
   class DangerTailor < Plugin
-    # The project root, which will be used to make the paths relative.
-    # Defaults to `pwd`.
-    # @return   [String] project_root value
-    attr_accessor :project_root
+    # The path to SwiftLint's execution
+    attr_accessor :binary_path
 
-    # A globbed string or array of strings which should match the files
-    # that you want to ignore warnings on. Defaults to nil.
-    # An example would be `'**/Pods/**'` to ignore warnings in Pods that your
-    # project uses.
-    #
-    # @return   [[String]] ignored-files
-    attr_accessor :ignored_files
+    # The path to SwiftLint's configuration file
+    attr_accessor :config_file
 
-    # Defines if the test summary will be sticky or not.
-    # Defaults to `false`.
-    # @return   [Boolean] sticky
-    attr_accessor :sticky_summary
+    # Allows you to specify a directory from where swiftlint will be run.
+    attr_accessor :directory
 
-    def project_root
-      root = @project_root || Dir.pwd
-      root += '/' unless root.end_with? '/'
-      root
-    end
+    # Maximum number of issues to be reported.
+    attr_accessor :max_num_violations
 
-    def ignored_files
-      [@ignored_files].flatten.compact
-    end
+    # Provides additional logging diagnostic information.
+    attr_accessor :verbose
 
-    def sticky_summary
-      @sticky_summary || false
-    end
+    # Whether all files should be linted in one pass
+    attr_accessor :lint_all_files
 
-    # Reads a file with JSON Xcode summary and reports it.
-    #
-    # @param    [String] file_path Path for Tailor summary in JSON format.
-    # @return   [void]
-    def report(file_path)
-      raise 'Summary file not found' unless File.file?(file_path)
-      tailor_summary = JSON.parse(File.read(file_path), symbolize_names: true)
-      run_summary(tailor_summary)
+    def report(files = nil, inline_mode: false, fail_on_error: false, additional_tailor_args: '', &select_block)
+      # Fails if tailor isn't installed
+      raise 'tailor is not installed' unless tailor.installed?
+
+      config_file_path = if config_file
+        config_file
+      elsif File.file?('.tailor.yml')
+        File.expand_path('.tailor.yml')
+      end
+      log "Using config file: #{config_file_path}"
+
+      dir_selected = directory ? File.expand_path(directory) : Dir.pwd
+      log "Tailor will be run from #{dir_selected}"
+
+      # Extract excluded paths
+      excluded_paths = format_paths(config['excluded'] || [], config_file_path)
+
+      log "Tailor will exclude the following paths: #{excluded_paths}"
+
+      # Extract included paths
+      included_paths = format_paths(config['included'] || [], config_file_path)
+
+      log "Tailor includes the following paths: #{included_paths}"
+
+      # Extract swift files (ignoring excluded ones)
+      files = find_swift_files(dir_selected, files, excluded_paths, included_paths)
+      log "Tailor will lint the following files: #{files.join(', ')}"
+
+      # Extract swift files (ignoring excluded ones)
+      files = find_swift_files(dir_selected, files, excluded_paths, included_paths)
+      log "Tailor will lint the following files: #{files.join(', ')}"
+
+      # Prepare Tailor options
+      options = {
+        # Make sure we don't fail when config path has spaces
+        config: config_file_path ? Shellwords.escape(config_file_path) : nil,
+        format: 'json'
+      }
+      log "linting with options: #{options}"
+
+      # Lint each file and collect the results
+      issues = run_tailor(files, lint_all_files, options, additional_tailor_args)
+      other_issues_count = 0
+      unless @max_num_violations.nil?
+        other_issues_count = issues.count - @max_num_violations if issues.count > @max_num_violations
+        issues = issues.take(@max_num_violations)
+      end
+      log "Received from Tailor: #{issues}"
+
+      # filter out any unwanted violations with the passed in select_block
+      if select_block
+        issues.select! { |issue| select_block.call(issue) }
+      end
+
+      # Filter warnings and errors
+      warnings = issues.select { |issue| issue['severity'] == 'warning' }
+      errors = issues.select { |issue| issue['severity'] == 'error' }
+
+      if inline_mode
+        # Report with inline comment
+        send_inline_comment(warnings, :warn)
+        send_inline_comment(errors, fail_on_error ? :fail : :warn)
+        warn other_issues_message(other_issues_count) if other_issues_count > 0
+      elsif warnings.count > 0 || errors.count > 0
+        # Report if any warning or error
+        message = "### SwiftLint found issues\n\n".dup
+        message << markdown_issues(warnings, 'Warnings') unless warnings.empty?
+        message << markdown_issues(errors, 'Errors') unless errors.empty?
+        message << "\n#{other_issues_message(other_issues_count)}" if other_issues_count > 0
+        markdown message
+
+        # Fail Danger on errors
+        if fail_on_error && errors.count > 0
+          fail 'Failed due to SwiftLint errors'
+        end
+end
     end
 
     private
@@ -69,41 +129,67 @@ module Danger
       parse_files(tailor_summary)
     end
 
-    def summary_message(tailor_summary)
-      summary = tailor_summary[:summary]
-      m = "Tailor Summary: Analyzed #{summary[:analyzed]} files. Found #{summary[:violations]} violations. #{summary[:warnings]} Warnings and #{summary[:errors]} Errors."
-      m << " Skipped #{summary[:skipped]} files." unless summary[:skipped].zero?
-      m
+    # Get the configuration file
+    def load_config(filepath)
+      return {} if filepath.nil? || !File.exist?(filepath)
+
+      config_file = File.open(filepath).read
+
+      YAML.safe_load(config_file)
     end
 
-    # A method that takes the tailor summary, and for each file, parses out
-    # any violations found.
-    def parse_files(tailor_summary)
-      tailor_summary[:files].each do |f|
-        parse_violations(f[:path], f[:violations])
-      end
-    end
-
-    # A method that takes a file path, and an array of tailor violation objects,
-    # parses the violation, and calls the appropriate Danger method
-    def parse_violations(file_path, violations)
-      violations.each do |v|
-        severity = v[:severity]
-        message = format_violation(file_path, v)
-
-        if severity == 'warning'
-          warn(message, sticky: false)
-        elsif severity == 'error'
-          fail(message, sticky: false)
-        end
-      end
-    end
-
-    # A method that returns a formatted string for a violation
-    # @return String
+    # Run swiftlint on each file and aggregate collect the issues
     #
-    def format_violation(file_path, violation)
-      "#{file_path}:#L#{violation[:location][:line]} -> #{violation[:rule]} - #{violation[:message]}"
+    # @return [Array] swiftlint issues
+    def run_tailor(files, lint_all_files, options, additional_tailor_args)
+      if lint_all_files
+        result = tailor.run(options, additional_swiftlint_args)
+        if result == ''
+          {}
+        else
+          JSON.parse(result).flatten
+        end
+      else
+        files
+          .map { |file| options.merge(path: file) }
+          .map { |full_options| tailor.run(full_options, additional_tailor_args) }
+          .reject { |s| s == '' }
+          .map { |s| JSON.parse(s).flatten }
+          .flatten
+      end
+    end
+
+    # Find swift files from the files glob
+    # If files are not provided it will use git modifield and added files
+    #
+    # @return [Array] swift files
+    def find_swift_files(dir_selected, files = nil, excluded_paths = [], included_paths = [])
+      # Needs to be escaped before comparsion with escaped file paths
+      dir_selected = Shellwords.escape(dir_selected)
+
+      # Assign files to lint
+      files = if files.nil?
+                (git.modified_files - git.deleted_files) + git.added_files
+              else
+                Dir.glob(files)
+              end
+      # Filter files to lint
+      files.
+        # Ensure only swift files are selected
+        select { |file| file.end_with?('.swift') }.
+        # Make sure we don't fail when paths have spaces
+        map { |file| Shellwords.escape(File.expand_path(file)) }.
+        # Remove dups
+        uniq.
+        # Ensure only files in the selected directory
+        select { |file| file.start_with?(dir_selected) }.
+        # Reject files excluded on configuration
+        reject { |file| file_exists?(excluded_paths, file) }.
+        # Accept files included on configuration
+        select do |file|
+        next true if included_paths.empty?
+        file_exists?(included_paths, file)
+      end
     end
   end
 end
