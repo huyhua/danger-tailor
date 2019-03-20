@@ -73,10 +73,6 @@ module Danger
       files = find_swift_files(dir_selected, files, excluded_paths, included_paths)
       log "Tailor will lint the following files: #{files.join(', ')}"
 
-      # Extract swift files (ignoring excluded ones)
-      files = find_swift_files(dir_selected, files, excluded_paths, included_paths)
-      log "Tailor will lint the following files: #{files.join(', ')}"
-
       # Prepare Tailor options
       options = {
         # Make sure we don't fail when config path has spaces
