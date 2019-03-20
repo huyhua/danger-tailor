@@ -24,21 +24,24 @@ module Danger
   # @tags xcode, swift, tailor, lint, format, xcodebuild
   #
   class DangerTailor < Plugin
-    # The path to SwiftLint's execution
+    # The path to Tailor's execution
     attr_accessor :binary_path
 
-    # The path to SwiftLint's configuration file
+    # The path to Tailor's configuration file
     attr_accessor :config_file
 
-    # Allows you to specify a directory from where swiftlint will be run.
+    # Allows you to specify a directory from where tailor will be run.
     attr_accessor :directory
+
+    # Provides additional logging diagnostic information.
+    attr_accessor :verbose
 
     # Maximum number of issues to be reported.
     attr_accessor :max_num_violations
 
     # Whether all files should be linted in one pass
     attr_accessor :lint_all_files
-
+    
     def report(files = nil, inline_mode: false, fail_on_error: false, additional_tailor_args: '', &select_block)
       # Fails if tailor isn't installed
       raise 'tailor is not installed' unless tailor.installed?
@@ -255,6 +258,10 @@ module Danger
     # @return [Tailor]
     def tailor
       Tailor.new(binary_path)
+    end
+
+    def log(text)
+      puts(text) if @verbose
     end
   end
 end
