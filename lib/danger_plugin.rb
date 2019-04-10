@@ -173,12 +173,12 @@ module Danger
       files.
       # Ensure only swift files are selected
       select { |file| file.end_with?('.swift') }.
+      # Ensure file must exist to continue
+      select { |file| File.exist?(file) }
       # Make sure we don't fail when paths have spaces
       map { |file| Shellwords.escape(File.expand_path(file)) }.
       # Remove dups
       uniq.
-      # Ensure file must exist to continue
-      select { |file| File.exist? file }
       # Ensure only files in the selected directory
       select { |file| file.start_with?(dir_selected) }.
       # Reject files excluded on configuration
