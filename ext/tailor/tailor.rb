@@ -12,7 +12,7 @@ class Tailor
     Dir.chdir options.delete(:pwd) if options.key? :pwd
 
     # run tailor with provided options
-    `#{tailor_path} #{file_path} #{tailor_arguments(options, additional_tailor_args)}`
+    `#{tailor_path} "#{file_path}" #{tailor_arguments(options, additional_tailor_args)}`
   end
 
   # Return true if tailor is installed or false otherwise
